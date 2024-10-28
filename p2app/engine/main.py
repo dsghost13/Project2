@@ -105,6 +105,19 @@ class Engine:
             except sqlite3.Error:
                 yield SaveContinentFailedEvent('Save Continent Failed')
 
+        elif isinstance(event, SaveContinentEvent):
+            try:
+                continent = event.continent()
+
+                # updates continent
+                self.connection.execute(f'''UPDATE continent
+                                            SET continent_code = \'{continent[1]}\',
+                                                name = \'{continent[2]}\'
+                                            WHERE continent_id = {continent[0]};''')
+                yield ContinentSavedEvent(continent)
+            except sqlite3.Error:
+                yield SaveContinentFailedEvent('Save Continent Failed')
+
         #---------#
         # Country #
         #---------#
@@ -160,6 +173,30 @@ class Engine:
                                             VALUES {country};''')
                 yield CountrySavedEvent(Country(*country))
 
+            except sqlite3.Error:
+                yield SaveCountryFailedEvent('Save Country Failed')
+
+        elif isinstance(event, SaveCountryEvent):
+            try:
+                country = event.country()
+
+                # checks for valid continent_id
+                cursor = self.connection.execute(f'''SELECT continent_id 
+                                                     FROM continent;''')
+                continent_ids = [continent_id[0] for continent_id in cursor]
+                if country[3] not in continent_ids:
+                    yield SaveCountryFailedEvent('Invalid Continent ID')
+                    raise sqlite3.Error
+
+                # updates country
+                self.connection.execute(f'''UPDATE country
+                                            SET country_code = \'{country[1]}\',
+                                                name = \'{country[2]}\',
+                                                continent_id = {country[3]},
+                                                wikipedia_link = \'{country[4]}\',
+                                                keywords = \'{country[5]}\'
+                                            WHERE country_id = {country[0]};''')
+                yield CountrySavedEvent(country)
             except sqlite3.Error:
                 yield SaveCountryFailedEvent('Save Country Failed')
 
@@ -246,5 +283,47 @@ class Engine:
                                             VALUES {region};''')
                 yield RegionSavedEvent(Region(*region))
 
+            except sqlite3.Error:
+                yield SaveRegionFailedEvent('Save Region Failed')
+
+        elif isinstance(event, SaveRegionEvent):
+            try:
+                region = event.region()
+
+                # checks for valid continent_id
+                cursor = self.connection.execute(f'''SELECT continent_id
+                                                     FROM continent;''')
+                continent_ids = [continent_id[0] for continent_id in cursor]
+                if region[4] not in continent_ids:
+                    yield SaveRegionFailedEvent('Invalid Continent ID')
+                    raise sqlite3.Error
+
+                # checks for valid country_id
+                cursor = self.connection.execute(f'''SELECT country_id
+                                                     FROM country;''')
+                country_ids = [country_id[0] for country_id in cursor]
+                if region[5] not in country_ids:
+                    yield SaveRegionFailedEvent('Invalid Country ID')
+                    raise sqlite3.Error
+
+                # checks that country matches continent
+                cursor = self.connection.execute(f'''SELECT continent_id, country_id
+                                                     FROM country
+                                                     WHERE continent_id = {region[4]} AND country_id = {region[5]};''')
+                if not cursor.fetchone():
+                    yield SaveRegionFailedEvent('Country Not In Continent')
+                    raise sqlite3.Error
+
+                # updates country
+                self.connection.execute(f'''UPDATE region
+                                            SET region_code = \'{region[1]}\',
+                                                local_code = \'{region[2]}\',
+                                                name = \'{region[3]}\',
+                                                continent_id = {region[4]},
+                                                country_id = {region[5]},
+                                                wikipedia_link = \'{region[6]}\',
+                                                keywords = \'{region[7]}\'
+                                            WHERE region_id = {region[0]};''')
+                yield RegionSavedEvent(region)
             except sqlite3.Error:
                 yield SaveRegionFailedEvent('Save Region Failed')
