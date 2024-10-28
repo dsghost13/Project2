@@ -76,6 +76,11 @@ class Engine:
             for continent in cursor:
                 yield ContinentSearchResultEvent(Continent(*continent))
 
+        elif isinstance(event, LoadContinentEvent):
+            continent_id = event.continent_id()
+            cursor = self.connection.execute(f'''SELECT * FROM continent WHERE continent_id = {continent_id};''')
+            yield ContinentLoadedEvent(Continent(*cursor.fetchone()))
+
         #---------#
         # Country #
         #---------#
@@ -96,6 +101,11 @@ class Engine:
             cursor = self.connection.execute(f'''SELECT * FROM country {where_statement};''')
             for country in cursor:
                 yield CountrySearchResultEvent(Country(*country))
+
+        elif isinstance(event, LoadCountryEvent):
+            country_id = event.country_id()
+            cursor = self.connection.execute(f'''SELECT * FROM country WHERE country_id = {country_id};''')
+            yield CountryLoadedEvent(Country(*cursor.fetchone()))
 
         #--------#
         # Region #
@@ -130,3 +140,8 @@ class Engine:
             cursor = self.connection.execute(f'''SELECT * FROM region {where_statement};''')
             for region in cursor:
                 yield RegionSearchResultEvent(Region(*region))
+
+        elif isinstance(event, LoadRegionEvent):
+            region_id = event.region_id()
+            cursor = self.connection.execute(f'''SELECT * FROM region WHERE region_id = {region_id};''')
+            yield RegionLoadedEvent(Region(*cursor.fetchone()))
