@@ -8,7 +8,11 @@
 # This is the outermost layer of the part of the program that you'll need to build,
 # which means that YOU WILL DEFINITELY NEED TO MAKE CHANGES TO THIS FILE.
 
+import os
+import sqlite3
+from webbrowser import Error
 
+from p2app.events import *
 
 class Engine:
     """An object that represents the application's engine, whose main role is to
@@ -26,7 +30,27 @@ class Engine:
         """A generator function that processes one event sent from the user interface,
         yielding zero or more events in response."""
 
-        # This is a way to write a generator function that always yields zero values.
-        # You'll want to remove this and replace it with your own code, once you start
-        # writing your engine, but this at least allows the program to run.
-        yield from ()
+        #----------#
+        # Database #
+        #----------#
+
+        if (isinstance(event, QuitInitiatedEvent)):
+            yield EndApplicationEvent()
+
+        elif (isinstance(event, OpenDatabaseEvent)):
+            try:
+                file_extension = os.path.splitext(event.path())[-1]
+                if file_extension == '.db':
+                    sqlite3.connect(event.path())
+                    yield DatabaseOpenedEvent(event.path())
+                else:
+                    raise sqlite3.Error
+            except sqlite3.Error:
+                yield DatabaseOpenFailedEvent('Database Open Failed')
+
+        #-------------#
+        # Application #
+        #-------------#
+
+        elif (isinstance(event, CloseDatabaseEvent)):
+            yield DatabaseClosedEvent()
