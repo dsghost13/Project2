@@ -10,6 +10,7 @@
 
 import os
 import sqlite3
+from webbrowser import Error
 
 from p2app.events import *
 
@@ -23,6 +24,7 @@ class Engine:
     def __init__(self):
         """Initializes the engine"""
         self.connection = None
+        self.cursor = None
 
 
     def process_event(self, event):
@@ -34,7 +36,10 @@ class Engine:
         #----------#
 
         if isinstance(event, QuitInitiatedEvent):
-            yield EndApplicationEvent()
+            try:
+                yield EndApplicationEvent()
+            except sqlite3.Error:
+                yield ErrorEvent('End Application Failed')
 
         elif isinstance(event, OpenDatabaseEvent):
             try:
@@ -42,59 +47,75 @@ class Engine:
                 file_extension = os.path.splitext(event.path())[-1]
                 if file_extension == '.db':
                     self.connection = sqlite3.connect(event.path())
+                    self.cursor = self.connection.execute('PRAGMA foreign_keys = ON;')
                     yield DatabaseOpenedEvent(event.path())
                 else:
-                    yield DatabaseOpenFailedEvent('Not a Database File')
-                    raise sqlite3.Error
-            except sqlite3.Error:
-                yield DatabaseOpenFailedEvent('Database Open Failed')
+                    raise sqlite3.Error('Not a Database File')
+
+            except sqlite3.Error as e:
+                if str(e):
+                    yield DatabaseOpenFailedEvent(str(e))
+                else:
+                    yield DatabaseOpenFailedEvent('Open Database Failed')
 
         #-------------#
         # Application #
         #-------------#
 
         elif isinstance(event, CloseDatabaseEvent):
-            yield DatabaseClosedEvent()
+            try:
+                self.cursor.close()
+                yield DatabaseClosedEvent()
+            except sqlite3.Error:
+                yield ErrorEvent('Close Database Failed')
 
         #-----------#
         # Continent #
         #-----------#
 
         elif isinstance(event, StartContinentSearchEvent):
-            # gets entered parameters
-            continent_code = event.continent_code()
-            name = event.name()
+            try:
+                # gets entered parameters
+                continent_code = event.continent_code()
+                name = event.name()
 
-            # generates WHERE statement
-            where_statement = f'continent_code = \'{continent_code}\' AND name = \'{name}\''
-            if not continent_code:
-                where_statement = f'name = \'{name}\''
-            elif not name:
-                where_statement = f'continent_code = \'{continent_code}\''
+                # generates WHERE statement
+                where_statement = f'continent_code = \'{continent_code}\' AND name = \'{name}\''
+                if not continent_code:
+                    where_statement = f'name = \'{name}\''
+                elif not name:
+                    where_statement = f'continent_code = \'{continent_code}\''
 
-            # retrieves matching continents
-            cursor = self.connection.execute(f'''SELECT * 
-                                                 FROM continent 
-                                                 WHERE {where_statement};''')
-            for continent in cursor:
-                yield ContinentSearchResultEvent(Continent(*continent))
+                # retrieves matching continents
+                self.cursor = self.connection.execute(f'''SELECT * 
+                                                     FROM continent 
+                                                     WHERE {where_statement};''')
+                for continent in self.cursor:
+                    yield ContinentSearchResultEvent(Continent(*continent))
+
+            except sqlite3.Error:
+                yield ErrorEvent('Continent Search Failed')
 
         elif isinstance(event, LoadContinentEvent):
-            # displays data of chosen continent
-            continent_id = event.continent_id()
-            cursor = self.connection.execute(f'''SELECT * 
-                                                 FROM continent 
-                                                 WHERE continent_id = {continent_id};''')
-            yield ContinentLoadedEvent(Continent(*cursor.fetchone()))
+            try:
+                # displays data of chosen continent
+                continent_id = event.continent_id()
+                self.cursor = self.connection.execute(f'''SELECT * 
+                                                     FROM continent 
+                                                     WHERE continent_id = {continent_id};''')
+                yield ContinentLoadedEvent(Continent(*self.cursor.fetchone()))
+
+            except sqlite3.Error:
+                yield ErrorEvent('Load Continent Failed')
 
         elif isinstance(event, SaveNewContinentEvent):
             try:
                 continent = list(event.continent())
 
                 # generates new continent_id
-                cursor = self.connection.execute(f'''SELECT continent_id
+                self.cursor = self.connection.execute(f'''SELECT continent_id
                                                      FROM continent ORDER BY continent_id DESC;''')
-                continent[0] = cursor.fetchone()[0] + 1
+                continent[0] = self.cursor.fetchone()[0] + 1
 
                 # inserts new continent
                 continent = tuple(continent)
@@ -115,6 +136,7 @@ class Engine:
                                                 name = \'{continent[2]}\'
                                             WHERE continent_id = {continent[0]};''')
                 yield ContinentSavedEvent(continent)
+
             except sqlite3.Error:
                 yield SaveContinentFailedEvent('Save Continent Failed')
 
@@ -123,49 +145,56 @@ class Engine:
         #---------#
 
         elif isinstance(event, StartCountrySearchEvent):
-            # gets entered parameters
-            country_code = event.country_code()
-            name = event.name()
+            try:
+                # gets entered parameters
+                country_code = event.country_code()
+                name = event.name()
 
-            # generates WHERE statement
-            where_statement = f'country_code = \'{country_code}\' AND name = \'{name}\''
-            if not country_code:
-                where_statement = f'name = \'{name}\''
-            elif not name:
-                where_statement = f'country_code = \'{country_code}\''
+                # generates WHERE statement
+                where_statement = f'country_code = \'{country_code}\' AND name = \'{name}\''
+                if not country_code:
+                    where_statement = f'name = \'{name}\''
+                elif not name:
+                    where_statement = f'country_code = \'{country_code}\''
 
-            # retrieves matching countries
-            cursor = self.connection.execute(f'''SELECT * 
-                                                 FROM country 
-                                                 WHERE {where_statement};''')
-            for country in cursor:
-                yield CountrySearchResultEvent(Country(*country))
+                # retrieves matching countries
+                self.cursor = self.connection.execute(f'''SELECT * 
+                                                     FROM country 
+                                                     WHERE {where_statement};''')
+                for country in self.cursor:
+                    yield CountrySearchResultEvent(Country(*country))
+
+            except sqlite3.Error:
+                yield ErrorEvent('Country Search Failed')
 
         elif isinstance(event, LoadCountryEvent):
-            # displays data of chosen country
-            country_id = event.country_id()
-            cursor = self.connection.execute(f'''SELECT * 
-                                                 FROM country 
-                                                 WHERE country_id = {country_id};''')
-            yield CountryLoadedEvent(Country(*cursor.fetchone()))
+            try:
+                # displays data of chosen country
+                country_id = event.country_id()
+                self.cursor = self.connection.execute(f'''SELECT * 
+                                                     FROM country 
+                                                     WHERE country_id = {country_id};''')
+                yield CountryLoadedEvent(Country(*self.cursor.fetchone()))
+
+            except sqlite3.Error:
+                yield ErrorEvent('Load Country Failed')
 
         elif isinstance(event, SaveNewCountryEvent):
             try:
                 country = list(event.country())
 
                 # checks for valid continent_id
-                cursor = self.connection.execute(f'''SELECT continent_id 
+                self.cursor = self.connection.execute(f'''SELECT continent_id 
                                                      FROM continent;''')
-                continent_ids = [continent_id[0] for continent_id in cursor]
+                continent_ids = [continent_id[0] for continent_id in self.cursor]
                 if country[3] not in continent_ids:
-                    yield SaveCountryFailedEvent('Invalid Continent ID')
-                    raise sqlite3.Error
+                    raise sqlite3.Error('Invalid Continent ID')
 
                 # generates new country_id
-                cursor = self.connection.execute(f'''SELECT country_id 
+                self.cursor = self.connection.execute(f'''SELECT country_id 
                                                      FROM country 
                                                      ORDER BY country_id DESC;''')
-                country[0] = cursor.fetchone()[0] + 1
+                country[0] = self.cursor.fetchone()[0] + 1
 
                 # inserts new country
                 country = tuple(country)
@@ -173,20 +202,22 @@ class Engine:
                                             VALUES {country};''')
                 yield CountrySavedEvent(Country(*country))
 
-            except sqlite3.Error:
-                yield SaveCountryFailedEvent('Save Country Failed')
+            except sqlite3.Error as e:
+                if str(e):
+                    yield SaveCountryFailedEvent(str(e))
+                else:
+                    yield SaveCountryFailedEvent('Save Country Failed')
 
         elif isinstance(event, SaveCountryEvent):
             try:
                 country = event.country()
 
                 # checks for valid continent_id
-                cursor = self.connection.execute(f'''SELECT continent_id 
-                                                     FROM continent;''')
-                continent_ids = [continent_id[0] for continent_id in cursor]
+                self.cursor = self.connection.execute(f'''SELECT continent_id 
+                                                          FROM continent;''')
+                continent_ids = [continent_id[0] for continent_id in self.cursor]
                 if country[3] not in continent_ids:
-                    yield SaveCountryFailedEvent('Invalid Continent ID')
-                    raise sqlite3.Error
+                    raise sqlite3.Error('Invalid Continent ID')
 
                 # updates country
                 self.connection.execute(f'''UPDATE country
@@ -197,85 +228,94 @@ class Engine:
                                                 keywords = \'{country[5]}\'
                                             WHERE country_id = {country[0]};''')
                 yield CountrySavedEvent(country)
-            except sqlite3.Error:
-                yield SaveCountryFailedEvent('Save Country Failed')
+
+            except sqlite3.Error as e:
+                if str(e):
+                    yield SaveCountryFailedEvent(str(e))
+                else:
+                    yield SaveCountryFailedEvent('Save Country Failed')
 
         #--------#
         # Region #
         #--------#
 
         elif isinstance(event, StartRegionSearchEvent):
-            # gets entered parameters
-            region_code = event.region_code()
-            local_code = event.local_code()
-            name = event.name()
+            try:
+                # gets entered parameters
+                region_code = event.region_code()
+                local_code = event.local_code()
+                name = event.name()
 
-            # scenario with all parameters entered
-            columns = [region_code, local_code, name]
-            params = [f'region_code = \'{region_code}\'',
-                      f'local_code = \'{local_code}\'',
-                      f'name =\'{name}\'']
+                # scenario with all parameters entered
+                columns = [region_code, local_code, name]
+                params = [f'region_code = \'{region_code}\'',
+                          f'local_code = \'{local_code}\'',
+                          f'name =\'{name}\'']
 
-            # removes unentered parameters
-            for i in range(2, -1, -1):
-                if not columns[i]:
-                    del params[i]
+                # removes unentered parameters
+                for i in range(2, -1, -1):
+                    if not columns[i]:
+                        del params[i]
 
-            # generates WHERE statement
-            where_statement = ''
-            for param in params:
-                if not where_statement:
-                    where_statement += 'WHERE ' + param
-                else:
-                    where_statement += 'AND ' + param
+                # generates WHERE statement
+                where_statement = ''
+                for param in params:
+                    if not where_statement:
+                        where_statement += 'WHERE ' + param
+                    else:
+                        where_statement += 'AND ' + param
 
-            # retrieves matching regions
-            cursor = self.connection.execute(f'''SELECT * 
-                                                 FROM region {where_statement};''')
-            for region in cursor:
-                yield RegionSearchResultEvent(Region(*region))
+                # retrieves matching regions
+                self.cursor = self.connection.execute(f'''SELECT * 
+                                                     FROM region {where_statement};''')
+                for region in self.cursor:
+                    yield RegionSearchResultEvent(Region(*region))
+
+            except sqlite3.Error:
+                yield ErrorEvent('Region Search Failed')
 
         elif isinstance(event, LoadRegionEvent):
-            # displays data of chosen region
-            region_id = event.region_id()
-            cursor = self.connection.execute(f'''SELECT * 
-                                                 FROM region 
-                                                 WHERE region_id = {region_id};''')
-            yield RegionLoadedEvent(Region(*cursor.fetchone()))
+            try:
+                # displays data of chosen region
+                region_id = event.region_id()
+                self.cursor = self.connection.execute(f'''SELECT * 
+                                                     FROM region 
+                                                     WHERE region_id = {region_id};''')
+                yield RegionLoadedEvent(Region(*self.cursor.fetchone()))
+
+            except sqlite3.Error:
+                yield ErrorEvent('Load Region Failed')
 
         elif isinstance(event, SaveNewRegionEvent):
             try:
                 region = list(event.region())
 
                 # checks for valid continent_id
-                cursor = self.connection.execute(f'''SELECT continent_id
+                self.cursor = self.connection.execute(f'''SELECT continent_id
                                                      FROM continent;''')
-                continent_ids = [continent_id[0] for continent_id in cursor]
+                continent_ids = [continent_id[0] for continent_id in self.cursor]
                 if region[4] not in continent_ids:
-                    yield SaveRegionFailedEvent('Invalid Continent ID')
-                    raise sqlite3.Error
+                    raise sqlite3.Error('Invalid Continent ID')
 
                 # checks for valid country_id
-                cursor = self.connection.execute(f'''SELECT country_id
+                self.cursor = self.connection.execute(f'''SELECT country_id
                                                      FROM country;''')
-                country_ids = [country_id[0] for country_id in cursor]
+                country_ids = [country_id[0] for country_id in self.cursor]
                 if region[5] not in country_ids:
-                    yield SaveRegionFailedEvent('Invalid Country ID')
-                    raise sqlite3.Error
+                    raise sqlite3.Error('Invalid Country ID')
 
                 # checks that country matches continent
-                cursor = self.connection.execute(f'''SELECT continent_id, country_id
+                self.cursor = self.connection.execute(f'''SELECT continent_id, country_id
                                                      FROM country
                                                      WHERE continent_id = {region[4]} AND country_id = {region[5]};''')
-                if not cursor.fetchone():
-                    yield SaveRegionFailedEvent('Country Not In Continent')
-                    raise sqlite3.Error
+                if not self.cursor.fetchone():
+                    raise sqlite3.Error('Country Not In Continent')
 
                 # generates new region_id
-                cursor = self.connection.execute('''SELECT region_id 
+                self.cursor = self.connection.execute('''SELECT region_id 
                                                     FROM region 
                                                     ORDER BY region_id DESC;''')
-                region[0] = cursor.fetchone()[0] + 1
+                region[0] = self.cursor.fetchone()[0] + 1
 
                 # inserts new region
                 region = tuple(region)
@@ -283,36 +323,36 @@ class Engine:
                                             VALUES {region};''')
                 yield RegionSavedEvent(Region(*region))
 
-            except sqlite3.Error:
-                yield SaveRegionFailedEvent('Save Region Failed')
+            except sqlite3.Error as e:
+                if str(e):
+                    yield SaveRegionFailedEvent(str(e))
+                else:
+                    yield SaveRegionFailedEvent('Save Region Failed')
 
         elif isinstance(event, SaveRegionEvent):
             try:
                 region = event.region()
 
                 # checks for valid continent_id
-                cursor = self.connection.execute(f'''SELECT continent_id
+                self.cursor = self.connection.execute(f'''SELECT continent_id
                                                      FROM continent;''')
-                continent_ids = [continent_id[0] for continent_id in cursor]
+                continent_ids = [continent_id[0] for continent_id in self.cursor]
                 if region[4] not in continent_ids:
-                    yield SaveRegionFailedEvent('Invalid Continent ID')
-                    raise sqlite3.Error
+                    raise sqlite3.Error('Invalid Continent ID')
 
                 # checks for valid country_id
-                cursor = self.connection.execute(f'''SELECT country_id
+                self.cursor = self.connection.execute(f'''SELECT country_id
                                                      FROM country;''')
-                country_ids = [country_id[0] for country_id in cursor]
+                country_ids = [country_id[0] for country_id in self.cursor]
                 if region[5] not in country_ids:
-                    yield SaveRegionFailedEvent('Invalid Country ID')
-                    raise sqlite3.Error
+                    raise sqlite3.Error('Invalid Country ID')
 
                 # checks that country matches continent
-                cursor = self.connection.execute(f'''SELECT continent_id, country_id
+                self.cursor = self.connection.execute(f'''SELECT continent_id, country_id
                                                      FROM country
                                                      WHERE continent_id = {region[4]} AND country_id = {region[5]};''')
-                if not cursor.fetchone():
-                    yield SaveRegionFailedEvent('Country Not In Continent')
-                    raise sqlite3.Error
+                if not self.cursor.fetchone():
+                    raise sqlite3.Error('Country Not In Continent')
 
                 # updates country
                 self.connection.execute(f'''UPDATE region
@@ -325,5 +365,9 @@ class Engine:
                                                 keywords = \'{region[7]}\'
                                             WHERE region_id = {region[0]};''')
                 yield RegionSavedEvent(region)
-            except sqlite3.Error:
-                yield SaveRegionFailedEvent('Save Region Failed')
+
+            except sqlite3.Error as e:
+                if str(e):
+                    yield SaveRegionFailedEvent(str(e))
+                else:
+                    yield SaveRegionFailedEvent('Save Region Failed')
