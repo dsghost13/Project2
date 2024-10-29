@@ -84,14 +84,8 @@ class Engine:
 
         elif isinstance(event, LoadContinentEvent):
             try:
-                # displays data of chosen continent
-                continent_id = event.continent_id()
-                self.cursor = self.connection.execute(f'''SELECT * 
-                                                          FROM continent 
-                                                          WHERE continent_id = {continent_id};''')
-                self.connection.commit()
-                yield ContinentLoadedEvent(Continent(*self.cursor.fetchone()))
-
+                continent_record = load_record(event, 'continent', self.connection)
+                yield ContinentLoadedEvent(Continent(*continent_record))
             except sqlite3.Error:
                 yield ErrorEvent('Load Continent Failed')
 
@@ -157,12 +151,8 @@ class Engine:
 
         elif isinstance(event, LoadCountryEvent):
             try:
-                # displays data of chosen country
-                country_id = event.country_id()
-                self.cursor = self.connection.execute(f'''SELECT * 
-                                                          FROM country 
-                                                          WHERE country_id = {country_id};''')
-                yield CountryLoadedEvent(Country(*self.cursor.fetchone()))
+                country_record = load_record(event, 'country', self.connection)
+                yield CountryLoadedEvent(Country(*country_record))
 
             except sqlite3.Error:
                 yield ErrorEvent('Load Country Failed')
@@ -279,13 +269,8 @@ class Engine:
 
         elif isinstance(event, LoadRegionEvent):
             try:
-                # displays data of chosen region
-                region_id = event.region_id()
-                self.cursor = self.connection.execute(f'''SELECT * 
-                                                          FROM region 
-                                                          WHERE region_id = {region_id};''')
-                yield RegionLoadedEvent(Region(*self.cursor.fetchone()))
-
+                region_record = load_record(event, 'region', self.connection)
+                yield RegionLoadedEvent(Region(*region_record))
             except sqlite3.Error:
                 yield ErrorEvent('Load Region Failed')
 
