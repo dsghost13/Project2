@@ -11,6 +11,7 @@
 import os
 import sqlite3
 
+from p2app.engine.utility_functions import *
 from p2app.events import *
 
 class Engine:
@@ -75,24 +76,9 @@ class Engine:
 
         elif isinstance(event, StartContinentSearchEvent):
             try:
-                # gets entered parameters
-                continent_code = event.continent_code()
-                name = event.name()
-
-                # generates WHERE statement
-                where_statement = f'continent_code = \'{continent_code}\' AND name = \'{name}\''
-                if not continent_code:
-                    where_statement = f'name = \'{name}\''
-                elif not name:
-                    where_statement = f'continent_code = \'{continent_code}\''
-
-                # retrieves matching continents
-                self.cursor = self.connection.execute(f'''SELECT * 
-                                                          FROM continent 
-                                                          WHERE {where_statement};''')
-                for continent in self.cursor:
+                matching_continents = search_database(event, 'continent', self.connection)
+                for continent in matching_continents:
                     yield ContinentSearchResultEvent(Continent(*continent))
-
             except sqlite3.Error:
                 yield ErrorEvent('Corrupted Continent Search')
 
@@ -162,24 +148,9 @@ class Engine:
 
         elif isinstance(event, StartCountrySearchEvent):
             try:
-                # gets entered parameters
-                country_code = event.country_code()
-                name = event.name()
-
-                # generates WHERE statement
-                where_statement = f'country_code = \'{country_code}\' AND name = \'{name}\''
-                if not country_code:
-                    where_statement = f'name = \'{name}\''
-                elif not name:
-                    where_statement = f'country_code = \'{country_code}\''
-
-                # retrieves matching countries
-                self.cursor = self.connection.execute(f'''SELECT * 
-                                                          FROM country 
-                                                          WHERE {where_statement};''')
-                for country in self.cursor:
+                matching_countries = search_database(event, 'country', self.connection)
+                for country in matching_countries:
                     yield CountrySearchResultEvent(Country(*country))
-
             except sqlite3.Error:
                 yield ErrorEvent('Corrupted Country Search')
 
@@ -299,36 +270,9 @@ class Engine:
 
         elif isinstance(event, StartRegionSearchEvent):
             try:
-                # gets entered parameters
-                region_code = event.region_code()
-                local_code = event.local_code()
-                name = event.name()
-
-                # scenario with all parameters entered
-                columns = [region_code, local_code, name]
-                params = [f'region_code = \'{region_code}\'',
-                          f'local_code = \'{local_code}\'',
-                          f'name = \'{name}\'']
-
-                # removes unentered parameters
-                for i in range(2, -1, -1):
-                    if not columns[i]:
-                        del params[i]
-
-                # generates WHERE statement
-                where_statement = ''
-                for param in params:
-                    if not where_statement:
-                        where_statement += 'WHERE ' + param
-                    else:
-                        where_statement += 'AND ' + param
-
-                # retrieves matching regions
-                self.cursor = self.connection.execute(f'''SELECT * 
-                                                          FROM region {where_statement};''')
-                for region in self.cursor:
+                matching_regions = search_database(event, 'region', self.connection)
+                for region in matching_regions:
                     yield RegionSearchResultEvent(Region(*region))
-
             except sqlite3.Error:
                 yield ErrorEvent('Corrupted Region Search')
 
