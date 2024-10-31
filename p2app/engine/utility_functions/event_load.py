@@ -3,6 +3,7 @@ def load_record(event, geo_scope: str, connection) -> tuple:
     matching_record = get_matching_record(record_id, geo_scope, connection)
     return matching_record
 
+
 def get_record_id(event, geo_scope: str) -> int:
     if geo_scope == 'continent':
         return event.continent_id()
@@ -10,6 +11,7 @@ def get_record_id(event, geo_scope: str) -> int:
         return event.country_id()
     elif geo_scope == 'region':
         return event.region_id()
+
 
 def get_matching_record(record_id: int, geo_scope: str, connection) -> tuple:
     cursor = connection.execute(f'''SELECT * 

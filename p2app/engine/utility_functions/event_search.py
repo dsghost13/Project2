@@ -4,6 +4,7 @@ def search_database(event, geo_scope: str, connection) -> list:
     matching_records = get_matching_records(where_statement, geo_scope, connection)
     return matching_records
 
+
 def get_widget_entries(event, geo_scope: str) -> dict:
     widget_entries = dict()
 
@@ -18,6 +19,7 @@ def get_widget_entries(event, geo_scope: str) -> dict:
     widget_entries['name'] = (event.name())
     return widget_entries
 
+
 def generate_where_statement(widget_entries: dict) -> str:
     where_statement = ''
 
@@ -29,6 +31,7 @@ def generate_where_statement(widget_entries: dict) -> str:
                 where_statement += f'AND {widget[0]} = \'{widget[1]}\''
 
     return where_statement
+
 
 def get_matching_records(where_statement: str, geo_scope: str, connection) -> list:
     cursor = connection.execute(f'''SELECT * 
