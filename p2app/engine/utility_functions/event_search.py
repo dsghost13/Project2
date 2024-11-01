@@ -1,6 +1,14 @@
+# p2app/engine/utility_functions/event_searching.py
+#
+# ICS 33 Fall 2024
+# Project 2: Learning to Fly
+#
+# Utility functions for searching-type events
+
 from p2app.engine.utility_functions.event_utils import convert_namedtuple
 
 def search_database(event, geo_scope: str, connection) -> list:
+    """Searches database for record matching user-inputted constraints"""
     widget_entries = get_widget_entries(event, geo_scope)
     where_statement = generate_where_statement(widget_entries)
     matching_records = get_matching_records(where_statement, geo_scope, connection)
@@ -8,6 +16,7 @@ def search_database(event, geo_scope: str, connection) -> list:
 
 
 def get_widget_entries(event, geo_scope: str) -> dict:
+    """Gets user input(s) from the GUI"""
     widget_entries = dict()
 
     if geo_scope == 'continent':
@@ -23,19 +32,21 @@ def get_widget_entries(event, geo_scope: str) -> dict:
 
 
 def generate_where_statement(widget_entries: dict) -> str:
+    """Generates a SQL WHERE statement for searching records"""
     where_statement = ''
 
     for widget in widget_entries.items():
         if widget[1]:
             if not where_statement:
-                where_statement += f'WHERE {widget[0]} = \'{widget[1]}\''
+                where_statement += f'WHERE {widget[0]} = {repr(widget[1])}'
             else:
-                where_statement += f'AND {widget[0]} = \'{widget[1]}\''
+                where_statement += f'AND {widget[0]} = {repr(widget[1])}'
 
     return where_statement
 
 
 def get_matching_records(where_statement: str, geo_scope: str, connection) -> list:
+    """Gets record with a matching id"""
     cursor = connection.execute(f'''SELECT * 
                                     FROM {geo_scope} 
                                     {where_statement};''')

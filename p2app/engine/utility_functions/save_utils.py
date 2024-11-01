@@ -1,6 +1,15 @@
+# p2app/engine/utility_functions/save_utils.py
+#
+# ICS 33 Fall 2024
+# Project 2: Learning to Fly
+#
+# Utility functions for saving-type events
+# Used in both inserting and updating
+
 from p2app.engine.utility_functions.event_utils import convert_namedtuple
 
 def get_record(event, geo_scope: str) -> list:
+    """Gets record the user is attempting to insert or update"""
     if geo_scope == 'continent':
         return list(event.continent())
     elif geo_scope == 'country':
@@ -10,6 +19,7 @@ def get_record(event, geo_scope: str) -> list:
 
 
 def invalid_widget_entries(record: list, geo_scope: str, connection) -> str | None:
+    """Flags when the user attempts to pass invalid input"""
     error_message = list()
     if geo_scope != 'continent':
         error_message.append(check_valid_id(record, geo_scope, 'continent', connection))
@@ -21,6 +31,7 @@ def invalid_widget_entries(record: list, geo_scope: str, connection) -> str | No
 
 
 def check_valid_id(record: list, geo_scope: str, geo_check: str, connection) -> str | None:
+    """Checks if the input id exists in the database"""
     cursor = connection.execute(f'''SELECT {geo_check}_id
                                     FROM {geo_check};''')
     geo_ids = [geo_id[0] for geo_id in cursor]
@@ -36,6 +47,7 @@ def check_valid_id(record: list, geo_scope: str, geo_check: str, connection) -> 
 
 
 def handle_empty_widget_entries(record: list, geo_scope: str) -> tuple:
+    """Assigns NULL to empty columns that allow NULL entries"""
     null_columns = {'continent': (-1, -1), 'country': (5, -1), 'region': (6, 7)}
     null_first = null_columns[geo_scope][0]
     null_second = null_columns[geo_scope][1]
@@ -51,9 +63,10 @@ def handle_empty_widget_entries(record: list, geo_scope: str) -> tuple:
 
 
 def format_for_sql(record: list):
+    """Keeps string apostrophes and handles potential injection"""
     for i in range(len(record)):
         if isinstance(record[i], str):
             if record[i] != 'NULL':
-                record[i] = f'\'{record[i]}\''
+                record[i] = repr(record[i])
         else:
             record[i] = str(record[i])
