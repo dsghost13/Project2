@@ -39,9 +39,9 @@ def generate_new_id(record: list, geo_scope: str, connection):
     cursor = connection.execute(f'''SELECT {geo_scope}_id 
                                     FROM {geo_scope} 
                                     ORDER BY {geo_scope}_id DESC;''')
-    recent_id = cursor.fetchone()[0]
-    if recent_id:
-        record[0] = recent_id + 1
+    recent_record = cursor.fetchone()
+    if recent_record is not None:
+        record[0] = recent_record[0] + 1
     else:
         record[0] = 1
     cursor.close()

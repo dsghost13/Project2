@@ -20,17 +20,28 @@ def get_record(event, geo_scope: str) -> list:
 
 def invalid_widget_entries(record: list, geo_scope: str, connection) -> str | None:
     """Flags when the user attempts to pass invalid input"""
-    error_message = list()
+    error_message = check_valid_code(record, geo_scope, connection)
     if geo_scope != 'continent':
-        error_message.append(check_valid_id(record, geo_scope, 'continent', connection))
+        error_message += check_valid_id(record, geo_scope, 'continent', connection)
         if geo_scope == 'region':
-            error_message.append(check_valid_id(record, geo_scope, 'country', connection))
-        for error in error_message:
-            if error:
-                return error
+            error_message += check_valid_id(record, geo_scope, 'country', connection)
+    if error_message:
+        return error_message
 
 
-def check_valid_id(record: list, geo_scope: str, geo_check: str, connection) -> str | None:
+def check_valid_code(record: list, geo_scope: str, connection) -> str:
+    """Checks if the input code is unique"""
+    cursor = connection.execute(f'''SELECT {geo_scope}_code
+                                    FROM {geo_scope};''')
+    geo_codes = [geo_code[0] for geo_code in cursor]
+    cursor.close()
+
+    if record[1] in geo_codes:
+        return f'{geo_scope.capitalize()} Code Taken\n'
+    return ''
+
+
+def check_valid_id(record: list, geo_scope: str, geo_check: str, connection) -> str:
     """Checks if the input id exists in the database"""
     cursor = connection.execute(f'''SELECT {geo_check}_id
                                     FROM {geo_check};''')
@@ -43,7 +54,8 @@ def check_valid_id(record: list, geo_scope: str, geo_check: str, connection) -> 
         geo_index = check_columns[geo_scope][1]
 
     if record[geo_index] not in geo_ids:
-        return f'Invalid {geo_check.capitalize()} ID'
+        return f'{geo_check.capitalize()} ID Does Not Exist\n'
+    return''
 
 
 def handle_empty_widget_entries(record: list, geo_scope: str) -> tuple:
