@@ -56,17 +56,7 @@ def handle_empty_widget_entries(record: list, geo_scope: str) -> tuple:
         if isinstance(record[i], str):
             if not record[i]:
                 if i == null_first or i == null_second:
-                    record[i] = 'NULL'
+                    record[i] = None
                 else:
                     record[i] = '(unassigned)'
     return convert_namedtuple(tuple(record), geo_scope)
-
-
-def format_for_sql(record: list):
-    """Keeps string apostrophes and handles potential injection"""
-    for i in range(len(record)):
-        if isinstance(record[i], str):
-            if record[i] != 'NULL':
-                record[i] = repr(record[i])
-        else:
-            record[i] = str(record[i])

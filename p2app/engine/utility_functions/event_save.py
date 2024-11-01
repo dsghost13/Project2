@@ -30,7 +30,6 @@ def save_record(event, mode: str, geo_scope: str, connection) -> str | tuple:
     if mode == 'insert':
         generate_new_id(record, geo_scope, connection)
     record_tuple = handle_empty_widget_entries(record, geo_scope)
-    format_for_sql(record)
     modify_table(mode, record, geo_scope, connection)
     return record_tuple
 
@@ -56,12 +55,13 @@ def modify_table(mode: str, record: list, geo_scope: str, connection):
 
     if mode == 'insert':
         connection.execute(f'''INSERT INTO {geo_scope} ({', '.join(parameters[geo_scope])})
-                               VALUES ({', '.join(record)});''')
+                               VALUES ({', '.join(['?' for _ in record])});''', record)
     elif mode == 'update':
         set_statement = generate_set_statement(record, parameters[geo_scope])
+        record_values = record[1:] + [record[0]]
         connection.execute(f'''UPDATE {geo_scope}
                                {set_statement}
-                               WHERE {geo_scope}_id = {record[0]};''')
+                               WHERE {geo_scope}_id = ?;''', record_values)
     connection.commit()
 
 
@@ -69,5 +69,5 @@ def generate_set_statement(record: list, parameters: list) -> str:
     """Generates a SQL SET statement for updating an existing record"""
     set_statement = 'SET'
     for i in range(1, len(record)):
-        set_statement += f' {parameters[i]} = {record[i]},'
+        set_statement += f' {parameters[i]} = ?,'
     return set_statement[:-1]

@@ -10,8 +10,8 @@ from p2app.engine.utility_functions.event_utils import convert_namedtuple
 def search_database(event, geo_scope: str, connection) -> list:
     """Searches database for record matching user-inputted constraints"""
     widget_entries = get_widget_entries(event, geo_scope)
-    where_statement = generate_where_statement(widget_entries)
-    matching_records = get_matching_records(where_statement, geo_scope, connection)
+    where_statement, entry_values = generate_where_statement(widget_entries)
+    matching_records = get_matching_records(where_statement, entry_values, geo_scope, connection)
     return matching_records
 
 
@@ -31,25 +31,26 @@ def get_widget_entries(event, geo_scope: str) -> dict:
     return widget_entries
 
 
-def generate_where_statement(widget_entries: dict) -> str:
+def generate_where_statement(widget_entries: dict) -> tuple:
     """Generates a SQL WHERE statement for searching records"""
     where_statement = ''
+    entry_values = list()
 
-    for widget in widget_entries.items():
-        if widget[1]:
+    for widget, entry in widget_entries.items():
+        if entry:
             if not where_statement:
-                where_statement += f'WHERE {widget[0]} = {repr(widget[1])}'
+                where_statement += f'WHERE {widget} = ? '
             else:
-                where_statement += f'AND {widget[0]} = {repr(widget[1])}'
+                where_statement += f'AND {widget} = ? '
+            entry_values.append(entry)
+    return where_statement, tuple(entry_values)
 
-    return where_statement
 
-
-def get_matching_records(where_statement: str, geo_scope: str, connection) -> list:
+def get_matching_records(where_statement: str, entry_values: tuple, geo_scope: str, connection) -> list:
     """Gets record with a matching id"""
     cursor = connection.execute(f'''SELECT * 
-                                    FROM {geo_scope} 
-                                    {where_statement};''')
+                                    FROM {geo_scope}
+                                    {where_statement};''', entry_values)
     matching_records = convert_namedtuple(cursor.fetchall(), geo_scope)
     cursor.close()
     return matching_records
