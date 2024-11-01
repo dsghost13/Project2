@@ -1,3 +1,5 @@
+from p2app.engine.utility_functions.event_utils import convert_namedtuple
+
 def load_record(event, geo_scope: str, connection) -> tuple:
     record_id = get_record_id(event, geo_scope)
     matching_record = get_matching_record(record_id, geo_scope, connection)
@@ -17,6 +19,6 @@ def get_matching_record(record_id: int, geo_scope: str, connection) -> tuple:
     cursor = connection.execute(f'''SELECT * 
                                     FROM {geo_scope} 
                                     WHERE {geo_scope}_id = {record_id};''')
-    matching_record = cursor.fetchone()
+    matching_record = convert_namedtuple(cursor.fetchone(), geo_scope)
     cursor.close()
     return matching_record

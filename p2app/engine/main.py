@@ -24,24 +24,35 @@ class Engine:
     def __init__(self):
         """Initializes the engine"""
         self.connection = None
+        self.event_map = {
+                            QuitInitiatedEvent: [EndApplicationEvent, ErrorEvent('End Application Failed')],
+                            OpenDatabaseEvent: [DatabaseOpenedEvent, DatabaseOpenFailedEvent],
+                            CloseDatabaseEvent: [DatabaseClosedEvent, ErrorEvent('Close Database Failed')],
+
+                            StartContinentSearchEvent: [ContinentSearchResultEvent, ErrorEvent('Corrupted Continent Search'), search_database, 'continent'],
+                            LoadContinentEvent: [ContinentLoadedEvent, ErrorEvent('Load Continent Failed'), load_record, 'continent'],
+                            SaveNewContinentEvent: [ContinentSavedEvent, SaveContinentFailedEvent, insert_record, 'continent'],
+                            SaveContinentEvent: [ContinentSavedEvent, SaveContinentFailedEvent, update_record, 'continent'],
+
+                            StartCountrySearchEvent: [CountrySearchResultEvent, ErrorEvent('Corrupted Country Search'), search_database, 'country'],
+                            LoadCountryEvent: [CountryLoadedEvent, ErrorEvent('Load Country Failed'), load_record, 'country'],
+                            SaveNewCountryEvent: [CountrySavedEvent, SaveCountryFailedEvent, insert_record, 'country'],
+                            SaveCountryEvent: [CountrySavedEvent, SaveCountryFailedEvent, update_record, 'country'],
+
+                            StartRegionSearchEvent: [RegionSearchResultEvent, ErrorEvent('Corrupted Region Search'), search_database, 'region'],
+                            LoadRegionEvent: [RegionLoadedEvent, ErrorEvent('Load Region Failed'), load_record, 'region'],
+                            SaveNewRegionEvent: [RegionSavedEvent, SaveRegionFailedEvent, insert_record, 'region'],
+                            SaveRegionEvent: [RegionSavedEvent, SaveRegionFailedEvent, update_record, 'region']
+                        }
 
 
     def process_event(self, event):
         """A generator function that processes one event sent from the user interface,
         yielding zero or more events in response."""
 
-        #----------#
-        # Database #
-        #----------#
-
-        if isinstance(event, QuitInitiatedEvent):
-            try:
-                yield EndApplicationEvent()
-            except sqlite3.Error:
-                yield ErrorEvent('End Application Failed')
-
-        elif isinstance(event, OpenDatabaseEvent):
-            try:
+        try:
+            # opens database
+            if isinstance(event, OpenDatabaseEvent):
                 file_extension = os.path.splitext(event.path())[-1]
                 if file_extension == '.db':
                     self.connection = sqlite3.connect(event.path())
@@ -49,126 +60,23 @@ class Engine:
                     yield DatabaseOpenedEvent(event.path())
                 else:
                     raise sqlite3.Error('Not a Database File')
-            except sqlite3.Error as e:
-                yield DatabaseOpenFailedEvent(str(e))
 
-        #-------------#
-        # Application #
-        #-------------#
+            # closes database or exits GUI
+            elif len(self.event_map[type(event)]) == 2:
+                yield self.event_map[type(event)][0]()
 
-        elif isinstance(event, CloseDatabaseEvent):
-            try:
-                yield DatabaseClosedEvent()
-            except sqlite3.Error:
-                yield ErrorEvent('Close Database Failed')
+            # GUI functionalities
+            else:
+                geo_scope = self.event_map[type(event)][3]
+                result = self.event_map[type(event)][2](event, geo_scope, self.connection)
+                if isinstance(result, str):
+                    raise sqlite3.Error(result)
+                for record in result:
+                    yield self.event_map[type(event)][0](record)
 
-        #-----------#
-        # Continent #
-        #-----------#
-
-        elif isinstance(event, StartContinentSearchEvent):
-            try:
-                matching_continents = search_database(event, 'continent', self.connection)
-                for continent in matching_continents:
-                    yield ContinentSearchResultEvent(Continent(*continent))
-            except sqlite3.Error:
-                yield ErrorEvent('Corrupted Continent Search')
-
-        elif isinstance(event, LoadContinentEvent):
-            try:
-                continent = load_record(event, 'continent', self.connection)
-                yield ContinentLoadedEvent(Continent(*continent))
-            except sqlite3.Error:
-                yield ErrorEvent('Load Continent Failed')
-
-        elif isinstance(event, SaveNewContinentEvent):
-            try:
-                continent = save_record(event, 'insert', 'continent', self.connection)
-                if isinstance(continent, str):
-                    raise sqlite3.Error(continent)
-                yield ContinentSavedEvent(Continent(*continent))
-            except sqlite3.Error as e:
-                yield SaveContinentFailedEvent(str(e))
-
-        elif isinstance(event, SaveContinentEvent):
-            try:
-                continent = save_record(event, 'update', 'continent', self.connection)
-                if isinstance(continent, str):
-                    raise sqlite3.Error(continent)
-                yield ContinentSavedEvent(Continent(*continent))
-            except sqlite3.Error as e:
-                yield SaveContinentFailedEvent(str(e))
-
-        #---------#
-        # Country #
-        #---------#
-
-        elif isinstance(event, StartCountrySearchEvent):
-            try:
-                matching_countries = search_database(event, 'country', self.connection)
-                for country in matching_countries:
-                    yield CountrySearchResultEvent(Country(*country))
-            except sqlite3.Error:
-                yield ErrorEvent('Corrupted Country Search')
-
-        elif isinstance(event, LoadCountryEvent):
-            try:
-                country = load_record(event, 'country', self.connection)
-                yield CountryLoadedEvent(Country(*country))
-            except sqlite3.Error:
-                yield ErrorEvent('Load Country Failed')
-
-        elif isinstance(event, SaveNewCountryEvent):
-            try:
-                country = save_record(event, 'insert', 'country', self.connection)
-                if isinstance(country, str):
-                    raise sqlite3.Error(country)
-                yield CountrySavedEvent(Country(*country))
-            except sqlite3.Error as e:
-                yield SaveCountryFailedEvent(str(e))
-
-        elif isinstance(event, SaveCountryEvent):
-            try:
-                country = save_record(event, 'update', 'country', self.connection)
-                if isinstance(country, str):
-                    raise sqlite3.Error(country)
-                yield CountrySavedEvent(Country(*country))
-            except sqlite3.Error as e:
-                yield SaveCountryFailedEvent(str(e))
-
-        #--------#
-        # Region #
-        #--------#
-
-        elif isinstance(event, StartRegionSearchEvent):
-            try:
-                matching_regions = search_database(event, 'region', self.connection)
-                for region in matching_regions:
-                    yield RegionSearchResultEvent(Region(*region))
-            except sqlite3.Error:
-                yield ErrorEvent('Corrupted Region Search')
-
-        elif isinstance(event, LoadRegionEvent):
-            try:
-                region = load_record(event, 'region', self.connection)
-                yield RegionLoadedEvent(Region(*region))
-            except sqlite3.Error:
-                yield ErrorEvent('Load Region Failed')
-
-        elif isinstance(event, SaveNewRegionEvent):
-            try:
-                region = save_record(event, 'insert', 'region', self.connection)
-                if isinstance(region, str):
-                    raise sqlite3.Error(region)
-                yield RegionSavedEvent(Region(*region))
-            except sqlite3.Error as e:
-                yield SaveRegionFailedEvent(str(e))
-
-        elif isinstance(event, SaveRegionEvent):
-            try:
-                region = save_record(event, 'update', 'region', self.connection)
-                if isinstance(region, str):
-                    raise sqlite3.Error(region)
-                yield RegionSavedEvent(Region(*region))
-            except sqlite3.Error as e:
-                yield SaveRegionFailedEvent(str(e))
+        # catches defined failures and additional ErrorEvent failures
+        except sqlite3.Error as e:
+            if isinstance(self.event_map[type(event)][1], ErrorEvent):
+                yield self.event_map[type(event)][1]
+            else:
+                yield self.event_map[type(event)][1](str(e))

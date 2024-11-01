@@ -1,3 +1,5 @@
+from p2app.engine.utility_functions.event_utils import convert_namedtuple
+
 def search_database(event, geo_scope: str, connection) -> list:
     widget_entries = get_widget_entries(event, geo_scope)
     where_statement = generate_where_statement(widget_entries)
@@ -37,6 +39,6 @@ def get_matching_records(where_statement: str, geo_scope: str, connection) -> li
     cursor = connection.execute(f'''SELECT * 
                                     FROM {geo_scope} 
                                     {where_statement};''')
-    matching_records = cursor.fetchall()
+    matching_records = convert_namedtuple(cursor.fetchall(), geo_scope)
     cursor.close()
     return matching_records

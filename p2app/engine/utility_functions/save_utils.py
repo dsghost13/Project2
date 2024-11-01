@@ -1,3 +1,5 @@
+from p2app.engine.utility_functions.event_utils import convert_namedtuple
+
 def get_record(event, geo_scope: str) -> list:
     if geo_scope == 'continent':
         return list(event.continent())
@@ -30,7 +32,7 @@ def check_valid_id(record: list, geo_scope: str, geo_check: str, connection) -> 
         geo_index = check_columns[geo_scope][1]
 
     if record[geo_index] not in geo_ids:
-        return f'Invalid {geo_check} ID'
+        return f'Invalid {geo_check.capitalize()} ID'
 
 
 def handle_empty_widget_entries(record: list, geo_scope: str) -> tuple:
@@ -45,7 +47,7 @@ def handle_empty_widget_entries(record: list, geo_scope: str) -> tuple:
                     record[i] = 'NULL'
                 else:
                     record[i] = '(unassigned)'
-    return tuple(record)
+    return convert_namedtuple(tuple(record), geo_scope)
 
 
 def format_for_sql(record: list):

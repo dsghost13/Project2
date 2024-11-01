@@ -1,11 +1,17 @@
 from p2app.engine.utility_functions.save_utils import *
 
+def insert_record(event, geo_scope: str, connection) -> str | tuple:
+    return save_record(event, 'insert', geo_scope, connection)
+
+def update_record(event, geo_scope: str, connection) -> str | tuple:
+    return save_record(event, 'update', geo_scope, connection)
+
 def save_record(event, mode: str, geo_scope: str, connection) -> str | tuple:
     record = get_record(event, geo_scope)
 
-    # error_message = invalid_widget_entries(record, geo_scope, connection)
-    # if error_message:
-    #     return error_message
+    error_message = invalid_widget_entries(record, geo_scope, connection)
+    if error_message:
+        return error_message
 
     if mode == 'insert':
         generate_new_id(record, geo_scope, connection)
